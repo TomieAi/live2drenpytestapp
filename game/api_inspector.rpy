@@ -210,12 +210,12 @@ init -1 python:
             "Asset loadable: Ready for BGM music playback" if mp3_ok else "Asset missing: audio/test.mp3 not found"
         )
 
-        wav_ok = renpy.loadable("audio/test.wav") if hasattr(renpy, "loadable") else os.path.exists("game/audio/test.wav")
+        wav_ok = renpy.loadable("audio/magic-stars-retro-sparkle.wav") if hasattr(renpy, "loadable") else os.path.exists("game/audio/magic-stars-retro-sparkle.wav")
         add_check(
             "Audio & Video",
-            "WAV Sound FX Asset (audio/test.wav)",
+            "WAV Sound FX Asset (sparkle.wav)",
             wav_ok,
-            "Asset loadable: Ready for SFX sound playback" if wav_ok else "Asset missing: audio/test.wav not found"
+            "Asset loadable: Ready for SFX sound playback" if wav_ok else "Asset missing: audio/magic-stars-retro-sparkle.wav not found"
         )
 
         mp4_ok = renpy.loadable("video/writing.mp4") if hasattr(renpy, "loadable") else os.path.exists("game/video/writing.mp4")

@@ -13,6 +13,8 @@ init python:
 
     def play_motion(motion_name):
         try:
+            if motion_name == "idle":
+                motion_name = "m01"
             renpy.store.current_motion = motion_name
             renpy.show(f"hiyori {motion_name}")
         except Exception as e:
@@ -81,7 +83,7 @@ default stat_str = 18
 default stat_agi = 24
 default stat_int = 30
 default stats = {"str": 18, "agi": 24, "int": 30}
-default current_motion = "m01"
+default current_motion = "m01 (idle)"
 default show_hud = True
 default show_tracking_line = False
 
@@ -160,7 +162,8 @@ transform positioning:
 label start:
     show screen displayLine
     show screen cheat_debug_hud
-    show hiyori still at positioning
+    show hiyori at positioning
+    $ play_motion("m01")
 
     h "Hello! Welcome to the Live2D & Engine Test Bench!"
 
@@ -280,9 +283,9 @@ label media_test_menu:
             h "Stopped BGM playback."
             jump media_test_menu
 
-        "🔔 Play Sound Effect (WAV Track)":
-            play sound "audio/test.wav"
-            h "Played audio/test.wav on the sound channel!"
+        "🔔 Play Retro Sparkle SFX (WAV Track)":
+            play sound "audio/magic-stars-retro-sparkle.wav"
+            h "Played audio/magic-stars-retro-sparkle.wav on the sound channel!"
             jump media_test_menu
 
         "🎬 Play Video Cutscene (MP4 Movie)":
