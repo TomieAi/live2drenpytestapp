@@ -299,12 +299,12 @@ screen api_compatibility_inspector():
                     frame:
                         background "#10b98133"
                         padding (10, 4)
-                        text "{color=#10b981}{b}✔ [ok_count] Ready{/b}{/color}" size 12
+                        text ("✔ " + str(ok_count) + " Ready") size 12 color "#10b981" bold True substitute False
 
                     frame:
                         background "#ef444433"
                         padding (10, 4)
-                        text "{color=#ef4444}{b}✘ [missing_count] Missing{/b}{/color}" size 12
+                        text ("✘ " + str(missing_count) + " Missing") size 12 color "#ef4444" bold True substitute False
 
                     textbutton "✕ Close":
                         background "#334155"
@@ -350,16 +350,16 @@ screen api_compatibility_inspector():
                                 yalign 0.5
 
                                 # Status Icon
-                                text ("{color=#10b981}{b}✔{/b}{/color}" if item["ok"] else "{color=#ef4444}{b}✘{/b}{/color}") size 16 yalign 0.5
+                                text ("✔" if item["ok"] else "✘") size 16 yalign 0.5 bold True color ("#10b981" if item["ok"] else "#ef4444") substitute False
 
                                 # Name & Details
                                 vbox:
                                     spacing 2
                                     hbox:
                                         spacing 8
-                                        text ("{b}" + item["name"] + "{/b}") size 12 color ("#ffffff" if item["ok"] else "#fca5a5")
-                                        text ("[" + item["category"] + "]") size 10 color "#64748b" yalign 0.5
-                                    text item["details"] size 10 color ("#94a3b8" if item["ok"] else "#f87171")
+                                        text item["name"] size 12 bold True color ("#ffffff" if item["ok"] else "#fca5a5") substitute False
+                                        text ("• " + item["category"]) size 10 color "#64748b" yalign 0.5 substitute False
+                                    text item["details"] size 10 color ("#94a3b8" if item["ok"] else "#f87171") substitute False
 
                                 # Right status badge
                                 frame:
@@ -367,4 +367,4 @@ screen api_compatibility_inspector():
                                     yalign 0.5
                                     background ("#10b981" if item["ok"] else "#ef4444")
                                     padding (8, 3)
-                                    text ("{b}AVAILABLE{/b}" if item["ok"] else "{b}MISSING{/b}") size 9 color "#ffffff"
+                                    text ("AVAILABLE" if item["ok"] else "MISSING") size 9 color "#ffffff" bold True substitute False
