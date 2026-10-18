@@ -187,6 +187,9 @@ label main_menu_loop:
         "🎲 High-Low Dice Game (Freezing Cheat Test)":
             jump dice_game_menu
 
+        "🎵 Audio & Video Media Player (MP3, WAV, MP4)":
+            jump media_test_menu
+
         "⌨️ Re-test Text Input (Android Soft Keyboard)":
             $ input_name = renpy.input("Type a new name:", default=player_name, length=20)
             $ input_name = input_name.strip()
@@ -261,6 +264,32 @@ label motion_selector_menu:
             $ play_motion("m08")
             h "Playing motion 08!"
             jump main_menu_loop
+
+# --- Audio & Video Media Test Suite ---
+label media_test_menu:
+    menu:
+        h "Audio & Video Codec Test Arena!\nTest background music, sound effects, and video playback on this engine."
+
+        "▶️ Play BGM Music (MP3 Track)":
+            play music "audio/test.mp3" loop
+            h "Playing audio/test.mp3 on the music channel! Notice how BGM loops seamlessly."
+            jump media_test_menu
+
+        "⏹️ Stop BGM Music":
+            stop music fadeout 1.0
+            h "Stopped BGM playback."
+            jump media_test_menu
+
+        "🔔 Play Sound Effect (WAV Track)":
+            play sound "audio/test.wav"
+            h "Played audio/test.wav on the sound channel!"
+            jump media_test_menu
+
+        "🎬 Play Video Cutscene (MP4 Movie)":
+            h "Starting full-screen video playback of video/writing.mp4... Tap or click to skip."
+            $ renpy.movie_cutscene("video/writing.mp4")
+            h "Video playback completed successfully! No codec or surface decoder errors."
+            jump media_test_menu
 
         "« Back to Main Test Menu":
             jump main_menu_loop

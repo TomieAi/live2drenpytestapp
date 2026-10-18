@@ -201,6 +201,31 @@ init -1 python:
             "Hardware decoding enabled" if hw_vid else "Software fallback / disabled"
         )
 
+        # Asset codec samples
+        mp3_ok = renpy.loadable("audio/test.mp3") if hasattr(renpy, "loadable") else os.path.exists("game/audio/test.mp3")
+        add_check(
+            "Audio & Video",
+            "MP3 Music Asset (audio/test.mp3)",
+            mp3_ok,
+            "Asset loadable: Ready for BGM music playback" if mp3_ok else "Asset missing: audio/test.mp3 not found"
+        )
+
+        wav_ok = renpy.loadable("audio/test.wav") if hasattr(renpy, "loadable") else os.path.exists("game/audio/test.wav")
+        add_check(
+            "Audio & Video",
+            "WAV Sound FX Asset (audio/test.wav)",
+            wav_ok,
+            "Asset loadable: Ready for SFX sound playback" if wav_ok else "Asset missing: audio/test.wav not found"
+        )
+
+        mp4_ok = renpy.loadable("video/writing.mp4") if hasattr(renpy, "loadable") else os.path.exists("game/video/writing.mp4")
+        add_check(
+            "Audio & Video",
+            "MP4 Movie Video Asset (video/writing.mp4)",
+            mp4_ok,
+            "Asset loadable: Ready for video cutscene playback" if mp4_ok else "Asset missing: video/writing.mp4 not found"
+        )
+
         has_input = hasattr(renpy, "input")
         add_check(
             "Audio & Video",
@@ -266,8 +291,17 @@ screen api_compatibility_inspector():
         total_count = len(api_audit_data)
         ok_count = sum(1 for item in api_audit_data if item["ok"])
         missing_count = total_count - ok_count
-        categories = ["All", "Live2D C Symbols", "Cython C-Extensions", "Android JNI & SDL2", "Engine Shims", "Graphics & GL2", "Audio & Video", "Core Architecture"]
-        filtered_items = [i for i in api_audit_data if api_filter_category == "All" or i["category"] == api_filter_category]
+        status_tabs = [("All", f"All ({total_count})"), ("Missing Only", f"✘ Missing Only ({missing_count})"), ("Ready Only", f"✔ Ready Only ({ok_count})")]
+        subsystem_categories = ["Live2D C Symbols", "Cython C-Extensions", "Android JNI & SDL2", "Engine Shims", "Graphics & GL2", "Audio & Video", "Core Architecture"]
+        
+        if api_filter_category == "Missing Only":
+            filtered_items = [i for i in api_audit_data if not i["ok"]]
+        elif api_filter_category == "Ready Only":
+            filtered_items = [i for i in api_audit_data if i["ok"]]
+        elif api_filter_category == "All":
+            filtered_items = api_audit_data
+        else:
+            filtered_items = [i for i in api_audit_data if i["category"] == api_filter_category]
 
     frame:
         xalign 0.5
@@ -275,10 +309,10 @@ screen api_compatibility_inspector():
         xsize 960
         ysize 640
         background "#0f172ae6"
-        padding (24, 20)
+        padding (24, 18)
 
         vbox:
-            spacing 10
+            spacing 8
 
             # Top Header Row
             hbox:
@@ -291,20 +325,22 @@ screen api_compatibility_inspector():
                     text "{b}{color=#38bdf8}🔍 Ren'Py, Live2D & Android API Matrix{/color}{/b}" size 20
                     text "Early Diagnostic Auditor: Green = Ready | Red = Missing (Needs JNI / Native Shim)" size 11 color "#94a3b8"
 
-                # Metric Summary Chips & Close Button
+                # Metric Summary Chips (Clickable Filters!) & Close Button
                 hbox:
                     xalign 1.0
                     spacing 8
 
-                    frame:
-                        background "#10b98133"
+                    button:
+                        background ("#10b981" if api_filter_category == "Ready Only" else "#10b98133")
                         padding (10, 4)
-                        text ("✔ " + str(ok_count) + " Ready") size 12 color "#10b981" bold True substitute False
+                        action SetVariable("api_filter_category", "Ready Only")
+                        text ("✔ " + str(ok_count) + " Ready") size 12 color ("#ffffff" if api_filter_category == "Ready Only" else "#10b981") bold True substitute False
 
-                    frame:
-                        background "#ef444433"
+                    button:
+                        background ("#ef4444" if api_filter_category == "Missing Only" else "#ef444433")
                         padding (10, 4)
-                        text ("✘ " + str(missing_count) + " Missing") size 12 color "#ef4444" bold True substitute False
+                        action SetVariable("api_filter_category", "Missing Only")
+                        text ("✘ " + str(missing_count) + " Missing") size 12 color ("#ffffff" if api_filter_category == "Missing Only" else "#ef4444") bold True substitute False
 
                     textbutton "✕ Close":
                         background "#334155"
@@ -313,17 +349,31 @@ screen api_compatibility_inspector():
                         text_size 12
                         action Hide("api_compatibility_inspector")
 
-            null height 2
-
-            # Category Filter Tabs
+            # Row 1: Status Filter Tabs (Quick Filter)
             hbox:
-                spacing 5
-                for cat in categories:
-                    textbutton cat:
+                spacing 6
+                text "Status:" size 11 color "#94a3b8" yalign 0.5
+                for tab_key, tab_label in status_tabs:
+                    $ is_sel = (api_filter_category == tab_key)
+                    $ btn_bg = "#ef4444" if (tab_key == "Missing Only" and is_sel) else ("#10b981" if (tab_key == "Ready Only" and is_sel) else ("#2563eb" if is_sel else ("#7f1d1d44" if tab_key == "Missing Only" else "#1e293b")))
+                    textbutton tab_label:
                         text_size 10
                         padding (8, 4)
-                        text_color ("#ffffff" if api_filter_category == cat else "#94a3b8")
-                        background ("#2563eb" if api_filter_category == cat else "#1e293b")
+                        text_color ("#ffffff" if is_sel else ("#f87171" if tab_key == "Missing Only" else "#94a3b8"))
+                        background btn_bg
+                        action SetVariable("api_filter_category", tab_key)
+
+            # Row 2: Subsystem Category Tabs
+            hbox:
+                spacing 5
+                text "Subsystem:" size 11 color "#94a3b8" yalign 0.5
+                for cat in subsystem_categories:
+                    $ is_sel = (api_filter_category == cat)
+                    textbutton cat:
+                        text_size 10
+                        padding (7, 4)
+                        text_color ("#ffffff" if is_sel else "#94a3b8")
+                        background ("#2563eb" if is_sel else "#1e293b")
                         action SetVariable("api_filter_category", cat)
 
             null height 2
@@ -333,11 +383,18 @@ screen api_compatibility_inspector():
                 scrollbars "vertical"
                 mousewheel True
                 draggable True
-                ysize 470
+                ysize 440
 
                 vbox:
                     spacing 6
                     xfill True
+
+                    if not filtered_items:
+                        frame:
+                            xfill True
+                            padding (24, 40)
+                            background "#1e293b33"
+                            text "🎉 No APIs match this filter! All items in this category are fully functional." size 13 color "#10b981" xalign 0.5
 
                     for item in filtered_items:
                         frame:
