@@ -260,19 +260,30 @@ init -1 python:
         # =========================================================================
         # 4. Cross-Version Engine Shims (Forward & Backward Compatibility)
         # =========================================================================
+        ver_tuple = getattr(renpy, "version_tuple", (8, 0, 0))
+        ver_str = getattr(renpy, "version_only", "Unknown")
+
+        # In a 7.4.x engine, these properties don't exist and are never queried.
+        # They only need to be polyfilled when running an old 7.4.x game on a 7.5+ runtime.
+        # When running on 7.4.5 native, they are completely N/A.
         shims = [
-            ("im.Cache.get_renders", hasattr(renpy.display.im.Cache, "get_renders"), "Polyfill for 7.4.x games on 7.4.11+ runtimes (mark_sweep)"),
-            ("config.gl2_modify_window_flags", hasattr(renpy.config, "gl2_modify_window_flags"), "Polyfill for 7.4.x games on 7.5+ runtimes"),
-            ("config.crop_relative_default", hasattr(renpy.config, "crop_relative_default"), "Polyfill for 7.4.x games on 7.5+ runtimes"),
-            ("config.always_shown_screens", hasattr(renpy.config, "always_shown_screens"), "Screen manager polyfill for 7.4.x on 7.5+ runtimes"),
-            ("Displayable._offer_size", hasattr(renpy.display.core.Displayable, "_offer_size"), "Layout engine property for 7.4.x on 7.5+ runtimes"),
-            ("Displayable._box_skip", hasattr(renpy.display.core.Displayable, "_box_skip"), "Box layout property for 7.4.x on 7.5+ runtimes"),
-            ("Displayable.delay", hasattr(renpy.display.core.Displayable, "delay"), "Transition timing property for 7.4.x on 7.5+ runtimes"),
+            ("im.Cache.get_renders", hasattr(renpy.display.im.Cache, "get_renders"), "7.4.11+ mark_sweep render eviction"),
+            ("config.gl2_modify_window_flags", hasattr(renpy.config, "gl2_modify_window_flags"), "7.5+ GL2 window flags default"),
+            ("config.crop_relative_default", hasattr(renpy.config, "crop_relative_default"), "7.5+ crop relative default"),
+            ("config.always_shown_screens", hasattr(renpy.config, "always_shown_screens"), "7.5+ screens manager default"),
+            ("Displayable._offer_size", hasattr(renpy.display.core.Displayable, "_offer_size"), "7.5+ layout size negotiation"),
+            ("Displayable._box_skip", hasattr(renpy.display.core.Displayable, "_box_skip"), "7.5+ layout box skip optimization"),
+            ("Displayable.delay", hasattr(renpy.display.core.Displayable, "delay"), "7.5+ transition delay timing"),
         ]
 
         for s_name, s_ok, s_desc in shims:
-            detail = ("Present: " + s_desc) if s_ok else ("MISSING: Needs shim in shims/renpy/main.py (" + s_desc + ")")
-            add_check("Engine Shims", s_name, s_ok, detail)
+            if s_name == "im.Cache.get_renders" and ver_tuple < (7, 4, 11):
+                add_check("Engine Shims", s_name, True, "N/A on " + ver_str + " (mark_sweep introduced in 7.4.11)")
+            elif s_name != "im.Cache.get_renders" and ver_tuple < (7, 5, 0):
+                add_check("Engine Shims", s_name, True, "N/A on " + ver_str + " (Feature introduced in 7.5.0+)")
+            else:
+                detail = ("Present: " + s_desc) if s_ok else ("MISSING: Needs shim in shims/renpy/main.py (" + s_desc + ")")
+                add_check("Engine Shims", s_name, s_ok, detail)
 
         # =========================================================================
         # 5. Graphics & GL2 Shaders
