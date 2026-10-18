@@ -5,7 +5,6 @@ init -1 python:
     import sys
     import os
     import ctypes
-    import importlib.util
 
     def audit_engine_apis():
         """Run comprehensive runtime inspection across all Ren'Py, Live2D & Android subsystems."""
@@ -44,7 +43,7 @@ init -1 python:
             "Live2D C Symbols",
             "Live2DCubismCore Native Library",
             cdll is not None,
-            f"Loaded: {os.path.basename(cubism_dll)}" if cdll else "DLL/SO not found in search path"
+            ("Loaded: " + os.path.basename(cubism_dll)) if cdll else "DLL/SO not found in search path"
         )
 
         # Inspect all key Cubism C functions
@@ -65,9 +64,9 @@ init -1 python:
             has_sym = hasattr(cdll, sym) if cdll else False
             if sym == "csmGetVersion" and has_sym:
                 val = hex(cdll.csmGetVersion())
-                detail = f"Exported (Version Code: {val}) - {desc}"
+                detail = "Exported (Version Code: {}) - {}".format(val, desc)
             else:
-                detail = f"Exported: {desc}" if has_sym else f"Missing symbol - {desc}"
+                detail = ("Exported: " + desc) if has_sym else ("Missing symbol - " + desc)
             add_check("Live2D C Symbols", sym, has_sym, detail)
 
         # =========================================================================
@@ -82,10 +81,11 @@ init -1 python:
 
         for mod_name, desc in cython_modules:
             try:
-                found = importlib.util.find_spec(mod_name) is not None
+                __import__(mod_name)
+                found = True
             except Exception:
                 found = False
-            detail = f"Available ({desc})" if found else f"MISSING binary (.so/.pyd) - {desc}"
+            detail = ("Available ({})".format(desc)) if found else ("MISSING binary (.so/.pyd) - " + desc)
             add_check("Cython C-Extensions", mod_name, found, detail)
 
         # =========================================================================
@@ -110,10 +110,10 @@ init -1 python:
                 ]
                 for jni_name, jni_desc in jni_checks:
                     has_jni = hasattr(SDLActivity, jni_name)
-                    detail = f"JNI exported: {jni_desc}" if has_jni else f"MISSING in librenpython.so: {jni_desc}"
-                    add_check("Android JNI & SDL2", f"SDLActivity.{jni_name}", has_jni, detail)
+                    detail = ("JNI exported: " + jni_desc) if has_jni else ("MISSING in librenpython.so: " + jni_desc)
+                    add_check("Android JNI & SDL2", "SDLActivity." + jni_name, has_jni, detail)
             except Exception as e:
-                add_check("Android JNI & SDL2", "PyJNIus Reflection", False, f"Could not reflect Android SDLActivity: {e}")
+                add_check("Android JNI & SDL2", "PyJNIus Reflection", False, "Could not reflect Android SDLActivity: " + str(e))
         else:
             add_check(
                 "Android JNI & SDL2",
@@ -136,7 +136,7 @@ init -1 python:
         ]
 
         for s_name, s_ok, s_desc in shims:
-            detail = f"Present: {s_desc}" if s_ok else f"MISSING: Needs shim in shims/renpy/main.py ({s_desc})"
+            detail = ("Present: " + s_desc) if s_ok else ("MISSING: Needs shim in shims/renpy/main.py (" + s_desc + ")")
             add_check("Engine Shims", s_name, s_ok, detail)
 
         # =========================================================================
@@ -246,19 +246,19 @@ init -1 python:
         # 7. Python Engine Architecture
         # =========================================================================
         py_major = sys.version_info[0]
-        py_ver_str = f"{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}"
+        py_ver_str = "{}.{}.{}".format(sys.version_info[0], sys.version_info[1], sys.version_info[2])
         add_check(
             "Core Architecture",
             "Python 3.x Modern Runtime",
             py_major >= 3,
-            f"Active: Python {py_ver_str} (Ren'Py 8.x modern runtime)" if py_major >= 3 else "Python 2.7 legacy runtime"
+            ("Active: Python {} (Ren'Py 8.x modern runtime)".format(py_ver_str)) if py_major >= 3 else "Python 2.7 legacy runtime"
         )
 
         add_check(
             "Core Architecture",
             "Python 2.7 Compatibility Mode",
             py_major == 2,
-            f"Active: Python 2.7 (Ren'Py 7.x runtime)" if py_major == 2 else f"Inactive (Running on Python {py_major}.x)"
+            "Active: Python 2.7 (Ren'Py 7.x runtime)" if py_major == 2 else ("Inactive (Running on Python {}.x)".format(py_major))
         )
 
         renpy_ver = renpy.version if hasattr(renpy, "version") else "Unknown"
@@ -266,7 +266,7 @@ init -1 python:
             "Core Architecture",
             "Ren'Py Engine Semver",
             True,
-            f"{renpy_ver}"
+            str(renpy_ver)
         )
 
         return results
@@ -291,7 +291,7 @@ screen api_compatibility_inspector():
         total_count = len(api_audit_data)
         ok_count = sum(1 for item in api_audit_data if item["ok"])
         missing_count = total_count - ok_count
-        status_tabs = [("All", f"All ({total_count})"), ("Missing Only", f"✘ Missing Only ({missing_count})"), ("Ready Only", f"✔ Ready Only ({ok_count})")]
+        status_tabs = [("All", "All ({})".format(total_count)), ("Missing Only", u"✘ Missing Only ({})".format(missing_count)), ("Ready Only", u"✔ Ready Only ({})".format(ok_count))]
         subsystem_categories = ["Live2D C Symbols", "Cython C-Extensions", "Android JNI & SDL2", "Engine Shims", "Graphics & GL2", "Audio & Video", "Core Architecture"]
         
         if api_filter_category == "Missing Only":
@@ -322,7 +322,7 @@ screen api_compatibility_inspector():
                 # Title & Subtitle
                 vbox:
                     spacing 2
-                    text "{b}{color=#38bdf8}🔍 Ren'Py, Live2D & Android API Matrix{/color}{/b}" size 20
+                    text "{b}{color=#38bdf8}(API MATRIX) Ren'Py, Live2D & Android Subsystems{/color}{/b}" size 20
                     text "Early Diagnostic Auditor: Green = Ready | Red = Missing (Needs JNI / Native Shim)" size 11 color "#94a3b8"
 
                 # Metric Summary Chips (Clickable Filters!) & Close Button
@@ -394,7 +394,7 @@ screen api_compatibility_inspector():
                             xfill True
                             padding (24, 40)
                             background "#1e293b33"
-                            text "🎉 No APIs match this filter! All items in this category are fully functional." size 13 color "#10b981" xalign 0.5
+                            text "No APIs match this filter! All items in this category are fully functional." size 13 color "#10b981" xalign 0.5
 
                     for item in filtered_items:
                         frame:

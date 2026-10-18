@@ -16,7 +16,7 @@ init python:
             if motion_name == "idle":
                 motion_name = "m01"
             renpy.store.current_motion = motion_name
-            renpy.show(f"hiyori {motion_name}")
+            renpy.show("hiyori {}".format(motion_name))
         except Exception as e:
             print("Error playing motion:", e)
 
@@ -29,13 +29,20 @@ init python:
                 play_motion(next_motion)
         click_flag = True
 
+    def compute_pos_raw(value, room):
+        if hasattr(absolute, "compute_raw"):
+            return absolute.compute_raw(value, room)
+        if isinstance(value, float):
+            return value * room
+        return value
+
     # Scaling and positioning logic from Ren'Py Live2D module
     def get_scaled_size(live_obj):
         zoom = live_obj.zoom
         sw, sh = live_obj.common.model.get_size()
         if zoom is None:
-            top = absolute.compute_raw(live_obj.top, sh)
-            base = absolute.compute_raw(live_obj.base, sh)
+            top = compute_pos_raw(live_obj.top, sh)
+            base = compute_pos_raw(live_obj.base, sh)
             size = max(base - top, 1.0)
             zoom = 1.0 * live_obj.height * renpy.config.screen_height / size
         else:
@@ -61,12 +68,29 @@ init python:
         live_obj.blend_parameter("ParamEyeBallY", "Overwrite", norm_y)
         return 1.0 / 30.0
 
+    # Live2D motion aliases mapping shorthand and idle to model filenames
+    hiyori_aliases = {
+        "idle": "hiyori_m01",
+        "m01": "hiyori_m01",
+        "m02": "hiyori_m02",
+        "m03": "hiyori_m03",
+        "m04": "hiyori_m04",
+        "m05": "hiyori_m05",
+        "m06": "hiyori_m06",
+        "m07": "hiyori_m07",
+        "m08": "hiyori_m08",
+    }
+
     # Define Live2D model instance
-    hiyori_obj = Live2D("Resources/hiyori_free", base=0.9, update_function=hiyori_update_func, loop=True, default_fade=0.0)
+    hiyori_obj = Live2D("Resources/hiyori_free", base=0.9, update_function=hiyori_update_func, loop=True, default_fade=0.0, aliases=hiyori_aliases)
     t, b, hiyori_w, hiyori_h = get_scaled_size(hiyori_obj)
     line = LineDisplayable([[(xloc - 10, hiyori_h * 0.2), (xloc + 10, hiyori_h * 0.2)]], color="#f00", width=2)
 
 image hiyori = hiyori_obj
+
+# Define Movie displayables for in-game video test
+image sample_movie_widesample = Movie(play="video/widesample.webm", loop=True, size=(854, 480))
+image sample_movie_writing = Movie(play="video/writing.webm", loop=True, size=(270, 480))
 
 # Define game character
 define h = Character("Hiyori", color="#ff70a6")
@@ -83,9 +107,13 @@ default stat_str = 18
 default stat_agi = 24
 default stat_int = 30
 default stats = {"str": 18, "agi": 24, "int": 30}
-default current_motion = "m01 (idle)"
+default current_motion = "idle"
 default show_hud = True
 default show_tracking_line = False
+
+# Video player test state
+default current_video_title = ""
+default current_video_displayable = ""
 
 # Shop & inventory variables
 default potion_count = 3
@@ -126,15 +154,15 @@ screen cheat_debug_hud():
             
             vbox:
                 spacing 4
-                text "{b}{color=#ff70a6}🎮 Live2D & Cheat Test Bench{/color}{/b}" size 15
+                text "{b}{color=#ff70a6}Live2D & Cheat Test Bench{/color}{/b}" size 15
                 null height 2
-                text "👤 Player: {b}[player_name]{/b} (Lv.[player_level])" size 13
-                text "💰 Gold: {color=#ffd166}{b}[gold]{/b}{/color}  |  💎 Gems: {color=#06d6a0}{b}[gems]{/b}{/color}" size 13
-                text "💖 Affection: {color=#ef476f}{b}[affection]/100{/b}{/color}" size 13
-                text "⚔️ STR: [stat_str]  🏃 AGI: [stat_agi]  🧠 INT: [stat_int]" size 12
-                text "🎒 Potion: [potion_count] | Elixir: [elixir_count] | Key: [key_count]" size 11
-                text "🎲 Bet: [dice_bet] G | Wins: [dice_wins] | Streak: [dice_streak]" size 11
-                text "🎭 Motion: {color=#38bdf8}{b}[current_motion]{/b}{/color}" size 12
+                text "Player: {b}[player_name]{/b} (Lv.[player_level])" size 13
+                text "Gold: {color=#ffd166}{b}[gold]{/b}{/color}  |  Gems: {color=#06d6a0}{b}[gems]{/b}{/color}" size 13
+                text "Affection: {color=#ef476f}{b}[affection]/100{/b}{/color}" size 13
+                text "STR: [stat_str]  |  AGI: [stat_agi]  |  INT: [stat_int]" size 12
+                text "Potions: [potion_count]  |  Elixirs: [elixir_count]  |  Keys: [key_count]" size 11
+                text "Bet: [dice_bet] G  |  Wins: [dice_wins]  |  Streak: [dice_streak]" size 11
+                text "Motion: {color=#38bdf8}{b}[current_motion]{/b}{/color}" size 12
 
     # Floating HUD action pills in top-right
     hbox:
@@ -142,14 +170,14 @@ screen cheat_debug_hud():
         yalign 0.02
         spacing 6
 
-        textbutton "🔍 API Matrix":
+        textbutton "(API Matrix)":
             text_size 12
             text_color "#ffffff"
             background "#2563ebcc"
             padding (10, 6)
             action Show("api_compatibility_inspector")
 
-        textbutton ("▾ Hide HUD" if show_hud else "▸ Show HUD"):
+        textbutton ("Hide HUD" if show_hud else "Show HUD"):
             text_size 12
             text_color "#ffffff"
             background "#1e293bcc"
@@ -163,7 +191,7 @@ label start:
     show screen displayLine
     show screen cheat_debug_hud
     show hiyori at positioning
-    $ play_motion("m01")
+    $ play_motion("idle")
 
     h "Hello! Welcome to the Live2D & Engine Test Bench!"
 
@@ -179,21 +207,21 @@ label main_menu_loop:
     menu:
         h "What would you like to test next?"
 
-        "🔍 API Compatibility Matrix (Live Subsystem Audit)":
+        "(API) Compatibility Matrix (Live Subsystem Audit)":
             show screen api_compatibility_inspector
-            h "Opened the API Compatibility Matrix! Click ✕ Close or press Escape to return."
+            h "Opened the API Compatibility Matrix! Click Close or press Escape to return."
             jump main_menu_loop
 
-        "🏪 Item Shop (Buy & Sell Test)":
+        "(Shop) Item Merchant (Buy & Sell Test)":
             jump shop_menu
 
-        "🎲 High-Low Dice Game (Freezing Cheat Test)":
+        "(Dice) High-Low Game (Freezing Cheat Test)":
             jump dice_game_menu
 
-        "🎵 Audio & Video Media Player (MP3, WAV, MP4)":
+        "(Media) Audio & Video Player (MP3, WAV, WebM)":
             jump media_test_menu
 
-        "⌨️ Re-test Text Input (Android Soft Keyboard)":
+        "(Input) Re-test Soft Keyboard (Android IME)":
             $ input_name = renpy.input("Type a new name:", default=player_name, length=20)
             $ input_name = input_name.strip()
             if input_name:
@@ -201,22 +229,22 @@ label main_menu_loop:
             h "Your name is now set to [player_name]! Notice how the HUD in the top-left updated instantly."
             jump main_menu_loop
 
-        "🎭 Switch Live2D Motions (m01 - m08)":
+        "(Motion) Switch Live2D Motions (m01 - m08)":
             jump motion_selector_menu
 
-        "💰 Test Variables & Cheats (+1000 Gold, +10 Affection)":
+        "(Cheats) Test Variables (+1000 Gold, +10 Affection)":
             $ gold += 1000
             $ affection += 10
             $ gems += 25
             h "Added +1000 Gold, +25 Gems, and +10 Affection!"
-            h "💡 Tip: You can also use GPlayer's in-game Cheat Engine menu to modify these variables directly, and the HUD will update in real time!"
+            h "Tip: You can also use GPlayer's in-game Cheat Engine menu to modify these variables directly, and the HUD will update in real time!"
             jump main_menu_loop
 
-        "🧪 Inspect Detailed Cheat Variables":
+        "(Inspect) Detailed Cheat Variables State":
             h "Current variable states:\nPlayer: [player_name] (Level [player_level]) | VIP: [is_vip]\nGold: [gold] | Gems: [gems] | Affection: [affection]/100\nStats: STR=[stat_str], AGI=[stat_agi], INT=[stat_int]\nInventory: Potions=[potion_count], Elixirs=[elixir_count], Keys=[key_count]"
             jump main_menu_loop
 
-        "👁️ Toggle Eye-Tracking Debug Line":
+        "(Debug) Toggle Eye-Tracking Indicator Line":
             $ show_tracking_line = not show_tracking_line
             if show_tracking_line:
                 h "Eye-tracking indicator is now ON."
@@ -227,6 +255,11 @@ label main_menu_loop:
 label motion_selector_menu:
     menu:
         h "Select a Live2D motion to trigger on Hiyori:"
+
+        "(Idle) Default Breathing Motion (m01 Loop)":
+            $ play_motion("idle")
+            h "Returned to default idle motion!"
+            jump main_menu_loop
 
         "Motion 1 (Gentle Greeting)":
             $ play_motion("m01")
@@ -268,33 +301,82 @@ label motion_selector_menu:
             h "Playing motion 08!"
             jump main_menu_loop
 
+# Screen for embedded in-engine video player testing (Movie displayable)
+screen video_player_modal():
+    modal True
+    zorder 200
+    add "#000000dd"
+    frame:
+        xalign 0.5
+        yalign 0.5
+        background "#0f172acc"
+        padding (24, 20)
+        vbox:
+            spacing 10
+            xalign 0.5
+            text "{b}(MOVIE TEST) In-Engine Video Displayable (Movie){/b}" size 17 color "#38bdf8" xalign 0.5
+            text "[current_video_title]" size 13 color "#94a3b8" xalign 0.5
+            null height 6
+            add current_video_displayable xalign 0.5
+            null height 10
+            textbutton "Close Video Player":
+                xalign 0.5
+                background "#dc2626"
+                hover_background "#b91c1c"
+                padding (28, 10)
+                text_size 15
+                text_bold True
+                text_color "#ffffff"
+                text_hover_color "#ffffff"
+                action Hide("video_player_modal")
+
 # --- Audio & Video Media Test Suite ---
 label media_test_menu:
     menu:
-        h "Audio & Video Codec Test Arena!\nTest background music, sound effects, and video playback on this engine."
+        h "Audio & Video Codec Test Arena!\nTest BGM music, sound effects, fullscreen cutscenes, and embedded Movie displayables."
 
-        "▶️ Play BGM Music (MP3 Track)":
+        "(Music) Play BGM Music Track (MP3)":
             play music "audio/test.mp3" loop
             h "Playing audio/test.mp3 on the music channel! Notice how BGM loops seamlessly."
             jump media_test_menu
 
-        "⏹️ Stop BGM Music":
+        "(Music) Stop BGM Playback":
             stop music fadeout 1.0
             h "Stopped BGM playback."
             jump media_test_menu
 
-        "🔔 Play Retro Sparkle SFX (WAV Track)":
+        "(Sound) Play Retro Sparkle SFX (WAV 16-bit PCM)":
             play sound "audio/magic-stars-retro-sparkle.wav"
             h "Played audio/magic-stars-retro-sparkle.wav on the sound channel!"
             jump media_test_menu
 
-        "🎬 Play Video Cutscene (MP4 Movie)":
-            h "Starting full-screen video playback of video/writing.mp4... Tap or click to skip."
-            $ renpy.movie_cutscene("video/writing.mp4")
-            h "Video playback completed successfully! No codec or surface decoder errors."
+        "(Video) Play Widescreen (Embedded Movie Displayable 16:9)":
+            $ current_video_title = "Widescreen Sample (1366x720 -> 854x480 VP9/WebM)"
+            $ current_video_displayable = "sample_movie_widesample"
+            show screen video_player_modal
+            h "Showing embedded Movie displayable! Click Close Video Player when finished."
             jump media_test_menu
 
-        "« Back to Main Test Menu":
+        "(Video) Play Widescreen Cutscene (Fullscreen Cutscene)":
+            $ renpy.pause(0.2)
+            $ renpy.movie_cutscene("video/widesample.webm")
+            h "Widescreen video cutscene completed!"
+            jump media_test_menu
+
+        "(Video) Play Portrait Writing (Embedded Movie Displayable 9:16)":
+            $ current_video_title = "Portrait Writing Sample (240x426 VP9/WebM)"
+            $ current_video_displayable = "sample_movie_writing"
+            show screen video_player_modal
+            h "Showing embedded Movie displayable! Click Close Video Player when finished."
+            jump media_test_menu
+
+        "(Video) Play Portrait Writing Cutscene (Fullscreen Cutscene)":
+            $ renpy.pause(0.2)
+            $ renpy.movie_cutscene("video/writing.webm")
+            h "Writing video cutscene completed!"
+            jump media_test_menu
+
+        "<< Back to Main Test Menu":
             jump main_menu_loop
 
 # --- Shop (Buy & Sell) System ---
@@ -302,20 +384,20 @@ label shop_menu:
     menu:
         h "Welcome to the Item Shop!\nGold: [gold] G | Potions: [potion_count] | Elixirs: [elixir_count] | Keys: [key_count]"
 
-        "🛒 Buy Items":
+        "(Buy) Purchase Items":
             jump shop_buy_menu
 
-        "💰 Sell Items (Half Price)":
+        "(Sell) Sell Items (Half Price Refund)":
             jump shop_sell_menu
 
-        "« Back to Main Menu":
+        "<< Back to Main Menu":
             jump main_menu_loop
 
 label shop_buy_menu:
     menu:
         h "Gold: [gold] G\nSelect an item to purchase:"
 
-        "🧪 Health Potion (50 Gold) - Owned: [potion_count]":
+        "(Potion) Health Potion (50 Gold) - Owned: [potion_count]":
             if gold >= 50:
                 $ gold -= 50
                 $ potion_count += 1
@@ -326,7 +408,7 @@ label shop_buy_menu:
                 h "Not enough Gold! You need 50 G, but only have [gold] G."
             jump shop_buy_menu
 
-        "✨ Magic Elixir (150 Gold) - Owned: [elixir_count]":
+        "(Elixir) Magic Elixir (150 Gold) - Owned: [elixir_count]":
             if gold >= 150:
                 $ gold -= 150
                 $ elixir_count += 1
@@ -337,7 +419,7 @@ label shop_buy_menu:
                 h "Not enough Gold! You need 150 G, but only have [gold] G."
             jump shop_buy_menu
 
-        "🎀 Live2D Charm (500 Gold) - Owned: [charm_count]":
+        "(Charm) Live2D Charm (500 Gold) - Owned: [charm_count]":
             if gold >= 500:
                 $ gold -= 500
                 $ charm_count += 1
@@ -348,7 +430,7 @@ label shop_buy_menu:
                 h "Not enough Gold! You need 500 G, but only have [gold] G."
             jump shop_buy_menu
 
-        "🗝️ Mystic Key (1000 Gold) - Owned: [key_count]":
+        "(Key) Mystic Key (1000 Gold) - Owned: [key_count]":
             if gold >= 1000:
                 $ gold -= 1000
                 $ key_count += 1
@@ -359,14 +441,14 @@ label shop_buy_menu:
                 h "Not enough Gold! You need 1000 G, but only have [gold] G."
             jump shop_buy_menu
 
-        "« Back to Shop":
+        "<< Back to Shop":
             jump shop_menu
 
 label shop_sell_menu:
     menu:
         h "Gold: [gold] G\nSelect an item to sell for half refund:"
 
-        "🧪 Sell Health Potion (+25 Gold) - Owned: [potion_count]":
+        "(Sell) Health Potion (+25 Gold) - Owned: [potion_count]":
             if potion_count > 0:
                 $ potion_count -= 1
                 $ gold += 25
@@ -377,7 +459,7 @@ label shop_sell_menu:
                 h "You don't have any Health Potions to sell!"
             jump shop_sell_menu
 
-        "✨ Sell Magic Elixir (+75 Gold) - Owned: [elixir_count]":
+        "(Sell) Magic Elixir (+75 Gold) - Owned: [elixir_count]":
             if elixir_count > 0:
                 $ elixir_count -= 1
                 $ gold += 75
@@ -388,7 +470,7 @@ label shop_sell_menu:
                 h "You don't have any Magic Elixirs to sell!"
             jump shop_sell_menu
 
-        "🎀 Sell Live2D Charm (+250 Gold) - Owned: [charm_count]":
+        "(Sell) Live2D Charm (+250 Gold) - Owned: [charm_count]":
             if charm_count > 0:
                 $ charm_count -= 1
                 $ gold += 250
@@ -399,7 +481,7 @@ label shop_sell_menu:
                 h "You don't have any Live2D Charms to sell!"
             jump shop_sell_menu
 
-        "🗝️ Sell Mystic Key (+500 Gold) - Owned: [key_count]":
+        "(Sell) Mystic Key (+500 Gold) - Owned: [key_count]":
             if key_count > 0:
                 $ key_count -= 1
                 $ gold += 500
@@ -410,22 +492,22 @@ label shop_sell_menu:
                 h "You don't have any Mystic Keys to sell!"
             jump shop_sell_menu
 
-        "« Back to Shop":
+        "<< Back to Shop":
             jump shop_menu
 
 # --- High-Low Dice Game (Freezing Cheat Test) ---
 label dice_game_menu:
     menu:
-        h "🎲 High-Low Dice Arena!\nGold: [gold] G | Bet: [dice_bet] G\nScore: [dice_wins] Wins, [dice_losses] Losses (Streak: [dice_streak])"
+        h "High-Low Dice Arena!\nGold: [gold] G | Bet: [dice_bet] G\nScore: [dice_wins] Wins, [dice_losses] Losses (Streak: [dice_streak])"
 
-        "🎲 Roll Dice against Hiyori (Bet: [dice_bet] Gold)":
+        "(Roll) Roll Dice against Hiyori (Bet: [dice_bet] Gold)":
             jump dice_roll_logic
 
-        "💵 Change Bet Amount":
+        "(Bet) Change Bet Amount":
             jump dice_bet_menu
 
-        "💡 Freezing Cheat Guide & Reset":
-            h "💡 Freezing Cheat Guide:\n1. Freeze 'gold' so losing never decreases your money!\n2. Freeze 'player_dice' or 'lucky_modifier' to 12+ to win every roll!\n3. Freeze 'dice_bet' to 1,000,000 for massive payouts!"
+        "(Help) Freezing Cheat Guide & Reset":
+            h "Freezing Cheat Guide:\n1. Freeze 'gold' so losing never decreases your money!\n2. Freeze 'player_dice' or 'lucky_modifier' to 12+ to win every roll!\n3. Freeze 'dice_bet' to 1,000,000 for massive payouts!"
             menu:
                 "Reset Dice Statistics":
                     $ dice_wins = 0
@@ -436,7 +518,7 @@ label dice_game_menu:
                     pass
             jump dice_game_menu
 
-        "« Back to Main Menu":
+        "<< Back to Main Menu":
             jump main_menu_loop
 
 label dice_bet_menu:
@@ -463,7 +545,7 @@ label dice_bet_menu:
             h "Bet set to 1,000 Gold!"
             jump dice_game_menu
 
-        "✏️ Enter Custom Bet (IME Input Test)":
+        "(Input) Enter Custom Bet (Soft Keyboard IME)":
             $ raw_bet = renpy.input("Enter custom bet amount (in Gold):", default=str(dice_bet), length=8)
             $ raw_bet = raw_bet.strip()
             python:
@@ -476,7 +558,7 @@ label dice_bet_menu:
             h "Bet is now set to [dice_bet] Gold!"
             jump dice_game_menu
 
-        "« Cancel":
+        "<< Cancel":
             jump dice_game_menu
 
 label dice_roll_logic:
@@ -500,15 +582,15 @@ label dice_roll_logic:
         $ dice_wins += 1
         $ dice_streak += 1
         $ play_motion("m04")
-        h "🎉 You WIN! +[dice_bet] Gold! (Streak: [dice_streak])"
+        h "(WIN) You WIN! +[dice_bet] Gold! (Streak: [dice_streak])"
     elif player_dice < opponent_dice:
         $ gold -= dice_bet
         $ dice_losses += 1
         $ dice_streak = 0
         $ play_motion("m08")
-        h "😢 You LOST! -[dice_bet] Gold. (Tip: Try freezing gold!)"
+        h "(LOST) You LOST! -[dice_bet] Gold. (Tip: Try freezing gold!)"
     else:
         $ play_motion("m02")
-        h "🤝 It's a TIE! Your [dice_bet] Gold bet was returned."
+        h "(TIE) It's a TIE! Your [dice_bet] Gold bet was returned."
 
     jump dice_game_menu
