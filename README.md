@@ -12,6 +12,9 @@ A comprehensive Ren'Py + Live2D Cubism test application designed to validate eng
   - Interactive motion triggers (`m01` through `m08`) and tap-to-animate functionality.
 - **⌨️ Android Soft Keyboard (IME) Input Test**:
   - Validates `renpy.input` soft keyboard stability, avoiding `UnsatisfiedLinkError` or `commitText` crashes across SDL2 and Android IME implementations.
+- **🔍 Real-Time API Compatibility Matrix**:
+  - Live engine audit inspecting active subsystems: Cubism C exports (v4 vs v5), GL2 renderer, GLSL shaders, audio/video playback, mobile APIs, and Python architecture.
+  - Visual color-coded matrix displaying `{color=#10b981}AVAILABLE{/color}` (green) vs `{color=#ef4444}MISSING{/color}` (red) across engine runtimes.
 - **🏪 Item Shop (Buy & Sell Test)**:
   - Interactive item economy with purchases and 50% refunds (Health Potions, Magic Elixirs, Live2D Charms, Mystic Keys).
   - Perfect for testing integer quantity search and variable freezing in Cheat Engine.

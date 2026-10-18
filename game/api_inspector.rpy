@@ -1,0 +1,370 @@
+# api_inspector.rpy - Comprehensive Ren'Py, Live2D & Android Native API Compatibility Matrix
+# Inspects active engine subsystems, Cubism C symbols, JNI methods, Cython extensions, and shims.
+
+init -1 python:
+    import sys
+    import os
+    import ctypes
+    import importlib.util
+
+    def audit_engine_apis():
+        """Run comprehensive runtime inspection across all Ren'Py, Live2D & Android subsystems."""
+        results = []
+
+        def add_check(category, name, ok, details):
+            results.append({
+                "category": category,
+                "name": name,
+                "ok": bool(ok),
+                "details": str(details)
+            })
+
+        # =========================================================================
+        # 1. Live2D Cubism Native C Library & Symbols
+        # =========================================================================
+        cubism_dll = None
+        cdll = None
+        for cand in ["Live2DCubismCore.dll", "libLive2DCubismCore.so", "libLive2DCubismCore.dylib"]:
+            p = os.path.abspath(cand)
+            if os.path.exists(p):
+                cubism_dll = p
+                break
+            exe_cand = os.path.join(os.path.dirname(sys.executable), cand)
+            if os.path.exists(exe_cand):
+                cubism_dll = exe_cand
+                break
+
+        if cubism_dll:
+            try:
+                cdll = ctypes.CDLL(cubism_dll)
+            except Exception as e:
+                cdll = None
+
+        add_check(
+            "Live2D C Symbols",
+            "Live2DCubismCore Native Library",
+            cdll is not None,
+            f"Loaded: {os.path.basename(cubism_dll)}" if cdll else "DLL/SO not found in search path"
+        )
+
+        # Inspect all key Cubism C functions
+        c_symbols = [
+            ("csmGetVersion", "Core semver query API"),
+            ("csmGetLatestMocVersion", "Latest supported .moc3 format version"),
+            ("csmGetRenderOrders", "Cubism 5 API: Render orders (Ren'Py 8.5.0+)"),
+            ("csmGetDrawableRenderOrders", "Cubism 4 API: Draw orders (Ren'Py 7.4.0 - 8.4.1)"),
+            ("csmInitializeModelInPlace", "Model memory buffer initialization"),
+            ("csmReviveMocInPlace", "MOC parser & memory resurrection"),
+            ("csmUpdateModel", "Dynamic physics & parameter solver"),
+            ("csmReadCanvasInfo", "Canvas pixel bounds & origin coordinates"),
+            ("csmGetParameterCount", "Parameter reflection count API"),
+            ("csmGetDrawableCount", "Mesh drawable part count API"),
+        ]
+
+        for sym, desc in c_symbols:
+            has_sym = hasattr(cdll, sym) if cdll else False
+            if sym == "csmGetVersion" and has_sym:
+                val = hex(cdll.csmGetVersion())
+                detail = f"Exported (Version Code: {val}) - {desc}"
+            else:
+                detail = f"Exported: {desc}" if has_sym else f"Missing symbol - {desc}"
+            add_check("Live2D C Symbols", sym, has_sym, detail)
+
+        # =========================================================================
+        # 2. Native Cython C-Extensions (.so / .pyd)
+        # =========================================================================
+        cython_modules = [
+            ("_renpy", "Core Cython C engine accelerator"),
+            ("renpy.style", "High-performance style calculator"),
+            ("renpy.gl2.gl2draw", "Hardware OpenGL/GLES renderer extension"),
+            ("renpy.gl2.live2dmodel", "Live2D Cython C++ bridge extension"),
+        ]
+
+        for mod_name, desc in cython_modules:
+            try:
+                found = importlib.util.find_spec(mod_name) is not None
+            except Exception:
+                found = False
+            detail = f"Available ({desc})" if found else f"MISSING binary (.so/.pyd) - {desc}"
+            add_check("Cython C-Extensions", mod_name, found, detail)
+
+        # =========================================================================
+        # 3. Android JNI & SDL2 Bridge
+        # =========================================================================
+        is_android = (
+            getattr(renpy, "android", False) or
+            getattr(renpy, "mobile", False) or
+            "ANDROID_ARGUMENT" in os.environ or
+            "ANDROID_PRIVATE" in os.environ
+        )
+
+        if is_android:
+            try:
+                from jnius import autoclass
+                SDLActivity = autoclass("org.libsdl.app.SDLActivity")
+                jni_checks = [
+                    ("nativeGenerateScancodeForUnichar", "Soft keyboard scancode JNI (SDL 2.0.9+; missing in 7.3.2/2.0.8)"),
+                    ("nativeCommitText", "IME text input commit bridge (Soft keyboard typing)"),
+                    ("nativeSetScreenResolution", "Screen resolution & display scaling bridge"),
+                    ("onNativeResize", "Window surface resize handler"),
+                ]
+                for jni_name, jni_desc in jni_checks:
+                    has_jni = hasattr(SDLActivity, jni_name)
+                    detail = f"JNI exported: {jni_desc}" if has_jni else f"MISSING in librenpython.so: {jni_desc}"
+                    add_check("Android JNI & SDL2", f"SDLActivity.{jni_name}", has_jni, detail)
+            except Exception as e:
+                add_check("Android JNI & SDL2", "PyJNIus Reflection", False, f"Could not reflect Android SDLActivity: {e}")
+        else:
+            add_check(
+                "Android JNI & SDL2",
+                "Android JNI Bridge (SDLActivity)",
+                False,
+                "Inactive in Desktop PC mode (Active when launched on Android test device)"
+            )
+
+        # =========================================================================
+        # 4. Cross-Version Engine Shims (Forward & Backward Compatibility)
+        # =========================================================================
+        shims = [
+            ("im.Cache.get_renders", hasattr(renpy.display.im.Cache, "get_renders"), "Polyfill for 7.4.x games on 7.4.11+ runtimes (mark_sweep)"),
+            ("config.gl2_modify_window_flags", hasattr(renpy.config, "gl2_modify_window_flags"), "Polyfill for 7.4.x games on 7.5+ runtimes"),
+            ("config.crop_relative_default", hasattr(renpy.config, "crop_relative_default"), "Polyfill for 7.4.x games on 7.5+ runtimes"),
+            ("config.always_shown_screens", hasattr(renpy.config, "always_shown_screens"), "Screen manager polyfill for 7.4.x on 7.5+ runtimes"),
+            ("Displayable._offer_size", hasattr(renpy.display.core.Displayable, "_offer_size"), "Layout engine property for 7.4.x on 7.5+ runtimes"),
+            ("Displayable._box_skip", hasattr(renpy.display.core.Displayable, "_box_skip"), "Box layout property for 7.4.x on 7.5+ runtimes"),
+            ("Displayable.delay", hasattr(renpy.display.core.Displayable, "delay"), "Transition timing property for 7.4.x on 7.5+ runtimes"),
+        ]
+
+        for s_name, s_ok, s_desc in shims:
+            detail = f"Present: {s_desc}" if s_ok else f"MISSING: Needs shim in shims/renpy/main.py ({s_desc})"
+            add_check("Engine Shims", s_name, s_ok, detail)
+
+        # =========================================================================
+        # 5. Graphics & GL2 Shaders
+        # =========================================================================
+        is_gl2 = getattr(renpy.config, "gl2", False)
+        add_check(
+            "Graphics & GL2",
+            "GL2 Model-Based Renderer",
+            is_gl2,
+            "Enabled (Hardware accelerated 3D/GL2 pipeline)" if is_gl2 else "Disabled (Legacy GL1 software pipeline)"
+        )
+
+        has_shader = hasattr(renpy, "register_shader") and callable(renpy.register_shader)
+        add_check(
+            "Graphics & GL2",
+            "Custom GLSL Shader System (register_shader)",
+            has_shader,
+            "register_shader API functional" if has_shader else "register_shader not found in renpy"
+        )
+
+        has_matrix = hasattr(renpy.display, "matrix") or hasattr(renpy.display.transform, "Matrix")
+        add_check(
+            "Graphics & GL2",
+            "3D Matrix Transform Engine",
+            has_matrix,
+            "Matrix / Transform3D class available" if has_matrix else "Matrix transforms not supported"
+        )
+
+        has_mark_sweep = hasattr(renpy.display.render, "mark_sweep")
+        add_check(
+            "Graphics & GL2",
+            "Render Cache Mark-Sweep (mark_sweep)",
+            has_mark_sweep,
+            "Present (Ren'Py 7.4.11+ / 8.x garbage eviction)" if has_mark_sweep else "Missing (Older 7.4.x layout)"
+        )
+
+        # =========================================================================
+        # 6. Audio, Video & Mobile Subsystems
+        # =========================================================================
+        has_audio = hasattr(renpy, "music") and hasattr(renpy.music, "play")
+        add_check(
+            "Audio & Video",
+            "Ren'Py Audio Subsystem (renpy.music)",
+            has_audio,
+            "Audio playback engine functional" if has_audio else "Audio subsystem missing"
+        )
+
+        has_movie = hasattr(renpy, "Movie")
+        add_check(
+            "Audio & Video",
+            "Movie Displayable (renpy.Movie)",
+            has_movie,
+            "Video playback displayable available" if has_movie else "Movie class missing"
+        )
+
+        hw_vid = getattr(renpy.config, "hw_video", False)
+        add_check(
+            "Audio & Video",
+            "Hardware Accelerated Video (hw_video)",
+            hw_vid,
+            "Hardware decoding enabled" if hw_vid else "Software fallback / disabled"
+        )
+
+        has_input = hasattr(renpy, "input")
+        add_check(
+            "Audio & Video",
+            "Soft Keyboard / Text Input (renpy.input)",
+            has_input,
+            "IME text input prompt ready" if has_input else "renpy.input missing"
+        )
+
+        has_touch = hasattr(renpy.display, "touch")
+        add_check(
+            "Audio & Video",
+            "Touch Interaction Subsystem",
+            has_touch,
+            "Touch event dispatching active" if has_touch else "Touch subsystem missing"
+        )
+
+        # =========================================================================
+        # 7. Python Engine Architecture
+        # =========================================================================
+        py_major = sys.version_info[0]
+        py_ver_str = f"{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}"
+        add_check(
+            "Core Architecture",
+            "Python 3.x Modern Runtime",
+            py_major >= 3,
+            f"Active: Python {py_ver_str} (Ren'Py 8.x modern runtime)" if py_major >= 3 else "Python 2.7 legacy runtime"
+        )
+
+        add_check(
+            "Core Architecture",
+            "Python 2.7 Compatibility Mode",
+            py_major == 2,
+            f"Active: Python 2.7 (Ren'Py 7.x runtime)" if py_major == 2 else f"Inactive (Running on Python {py_major}.x)"
+        )
+
+        renpy_ver = renpy.version if hasattr(renpy, "version") else "Unknown"
+        add_check(
+            "Core Architecture",
+            "Ren'Py Engine Semver",
+            True,
+            f"{renpy_ver}"
+        )
+
+        return results
+
+default api_filter_category = "All"
+default api_audit_data = []
+
+# --- Material 3 Style API Inspector Dialog Screen ---
+screen api_compatibility_inspector():
+    modal True
+    zorder 200
+
+    # Dim background overlay
+    add "#000000bb"
+
+    # Refresh audit data on screen open
+    on "show" action SetVariable("api_audit_data", audit_engine_apis())
+
+    python:
+        if not api_audit_data:
+            api_audit_data = audit_engine_apis()
+        total_count = len(api_audit_data)
+        ok_count = sum(1 for item in api_audit_data if item["ok"])
+        missing_count = total_count - ok_count
+        categories = ["All", "Live2D C Symbols", "Cython C-Extensions", "Android JNI & SDL2", "Engine Shims", "Graphics & GL2", "Audio & Video", "Core Architecture"]
+        filtered_items = [i for i in api_audit_data if api_filter_category == "All" or i["category"] == api_filter_category]
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xsize 960
+        ysize 640
+        background "#0f172ae6"
+        padding (24, 20)
+
+        vbox:
+            spacing 10
+
+            # Top Header Row
+            hbox:
+                spacing 14
+                xfill True
+
+                # Title & Subtitle
+                vbox:
+                    spacing 2
+                    text "{b}{color=#38bdf8}🔍 Ren'Py, Live2D & Android API Matrix{/color}{/b}" size 20
+                    text "Early Diagnostic Auditor: Green = Ready | Red = Missing (Needs JNI / Native Shim)" size 11 color "#94a3b8"
+
+                # Metric Summary Chips & Close Button
+                hbox:
+                    xalign 1.0
+                    spacing 8
+
+                    frame:
+                        background "#10b98133"
+                        padding (10, 4)
+                        text "{color=#10b981}{b}✔ [ok_count] Ready{/b}{/color}" size 12
+
+                    frame:
+                        background "#ef444433"
+                        padding (10, 4)
+                        text "{color=#ef4444}{b}✘ [missing_count] Missing{/b}{/color}" size 12
+
+                    textbutton "✕ Close":
+                        background "#334155"
+                        padding (12, 4)
+                        text_color "#ffffff"
+                        text_size 12
+                        action Hide("api_compatibility_inspector")
+
+            null height 2
+
+            # Category Filter Tabs
+            hbox:
+                spacing 5
+                for cat in categories:
+                    textbutton cat:
+                        text_size 10
+                        padding (8, 4)
+                        text_color ("#ffffff" if api_filter_category == cat else "#94a3b8")
+                        background ("#2563eb" if api_filter_category == cat else "#1e293b")
+                        action SetVariable("api_filter_category", cat)
+
+            null height 2
+
+            # Scrollable API Audit Viewport
+            viewport:
+                scrollbars "vertical"
+                mousewheel True
+                draggable True
+                ysize 470
+
+                vbox:
+                    spacing 6
+                    xfill True
+
+                    for item in filtered_items:
+                        frame:
+                            xfill True
+                            padding (12, 8)
+                            background ("#064e3b33" if item["ok"] else "#7f1d1d33")
+
+                            hbox:
+                                spacing 12
+                                yalign 0.5
+
+                                # Status Icon
+                                text ("{color=#10b981}{b}✔{/b}{/color}" if item["ok"] else "{color=#ef4444}{b}✘{/b}{/color}") size 16 yalign 0.5
+
+                                # Name & Details
+                                vbox:
+                                    spacing 2
+                                    hbox:
+                                        spacing 8
+                                        text ("{b}" + item["name"] + "{/b}") size 12 color ("#ffffff" if item["ok"] else "#fca5a5")
+                                        text ("[" + item["category"] + "]") size 10 color "#64748b" yalign 0.5
+                                    text item["details"] size 10 color ("#94a3b8" if item["ok"] else "#f87171")
+
+                                # Right status badge
+                                frame:
+                                    xalign 1.0
+                                    yalign 0.5
+                                    background ("#10b981" if item["ok"] else "#ef4444")
+                                    padding (8, 3)
+                                    text ("{b}AVAILABLE{/b}" if item["ok"] else "{b}MISSING{/b}") size 9 color "#ffffff"

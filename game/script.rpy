@@ -134,15 +134,25 @@ screen cheat_debug_hud():
                 text "🎲 Bet: [dice_bet] G | Wins: [dice_wins] | Streak: [dice_streak]" size 11
                 text "🎭 Motion: {color=#38bdf8}{b}[current_motion]{/b}{/color}" size 12
 
-    # Floating HUD toggle pill in top-right
-    textbutton ("▾ Hide HUD" if show_hud else "▸ Show HUD"):
+    # Floating HUD action pills in top-right
+    hbox:
         xalign 0.98
         yalign 0.02
-        text_size 12
-        text_color "#ffffff"
-        background "#1e293bcc"
-        padding (10, 6)
-        action ToggleVariable("show_hud")
+        spacing 6
+
+        textbutton "🔍 API Matrix":
+            text_size 12
+            text_color "#ffffff"
+            background "#2563ebcc"
+            padding (10, 6)
+            action Show("api_compatibility_inspector")
+
+        textbutton ("▾ Hide HUD" if show_hud else "▸ Show HUD"):
+            text_size 12
+            text_color "#ffffff"
+            background "#1e293bcc"
+            padding (10, 6)
+            action ToggleVariable("show_hud")
 
 transform positioning:
     xpos int(xloc) - int(hiyori_w / 2)
@@ -165,6 +175,11 @@ label start:
 label main_menu_loop:
     menu:
         h "What would you like to test next?"
+
+        "🔍 API Compatibility Matrix (Live Subsystem Audit)":
+            show screen api_compatibility_inspector
+            h "Opened the API Compatibility Matrix! Click ✕ Close or press Escape to return."
+            jump main_menu_loop
 
         "🏪 Item Shop (Buy & Sell Test)":
             jump shop_menu
