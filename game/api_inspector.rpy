@@ -440,125 +440,137 @@ screen api_compatibility_inspector():
         else:
             filtered_items = [i for i in api_audit_data if i["category"] == api_filter_category]
 
+        is_mobile = renpy.variant("touch") or renpy.variant("small") or getattr(renpy, "android", False) or ("ANDROID_ARGUMENT" in os.environ)
+        
+        scr_w = getattr(renpy.config, "screen_width", 1280)
+        scr_h = getattr(renpy.config, "screen_height", 720)
+        
+        dialog_w = (scr_w - 40) if is_mobile else 1040
+        dialog_h = (scr_h - 30) if is_mobile else 650
+        vp_h = dialog_h - (195 if is_mobile else 185)
+
     frame:
         xalign 0.5
         yalign 0.5
-        xsize 960
-        ysize 640
+        xsize 1740
+        ysize 980
         background "#0f172ae6"
-        padding (24, 18)
+        padding (32, 24)
 
         vbox:
-            spacing 8
+            spacing 12
 
             # Top Header Row
             hbox:
-                spacing 14
+                spacing 20
                 xfill True
 
                 # Title & Subtitle
                 vbox:
-                    spacing 2
-                    text "{b}{color=#38bdf8}(API MATRIX) Ren'Py, Live2D & Android Subsystems{/color}{/b}" size 20
-                    text "Early Diagnostic Auditor: Green = Ready | Red = Missing (Needs JNI / Native Shim)" size 11 color "#94a3b8"
+                    spacing 4
+                    text "{b}{color=#38bdf8}(API MATRIX) Ren'Py, Live2D & Android Subsystems{/color}{/b}" size 30
+                    text "Early Diagnostic Auditor: Green = Ready | Red = Missing (Needs JNI / Native Shim)" size 16 color "#94a3b8"
 
                 # Metric Summary Chips (Clickable Filters!) & Close Button
                 hbox:
                     xalign 1.0
-                    spacing 8
+                    spacing 12
+                    yalign 0.5
 
                     button:
                         background ("#10b981" if api_filter_category == "Ready Only" else "#10b98133")
-                        padding (10, 4)
+                        padding (18, 8)
                         action SetVariable("api_filter_category", "Ready Only")
-                        text ("✔ " + str(ok_count) + " Ready") size 12 color ("#ffffff" if api_filter_category == "Ready Only" else "#10b981") bold True substitute False
+                        text ("✔ " + str(ok_count) + " Ready") size 18 color ("#ffffff" if api_filter_category == "Ready Only" else "#10b981") bold True substitute False
 
                     button:
                         background ("#ef4444" if api_filter_category == "Missing Only" else "#ef444433")
-                        padding (10, 4)
+                        padding (18, 8)
                         action SetVariable("api_filter_category", "Missing Only")
-                        text ("✘ " + str(missing_count) + " Missing") size 12 color ("#ffffff" if api_filter_category == "Missing Only" else "#ef4444") bold True substitute False
+                        text ("✘ " + str(missing_count) + " Missing") size 18 color ("#ffffff" if api_filter_category == "Missing Only" else "#ef4444") bold True substitute False
 
                     textbutton "✕ Close":
-                        background "#334155"
-                        padding (12, 4)
+                        background "#dc2626"
+                        hover_background "#b91c1c"
+                        padding (22, 8)
                         text_color "#ffffff"
-                        text_size 12
+                        text_size 18
+                        text_bold True
                         action Hide("api_compatibility_inspector")
 
             # Row 1: Status Filter Tabs (Quick Filter)
             hbox:
-                spacing 6
-                text "Status:" size 11 color "#94a3b8" yalign 0.5
+                spacing 8
+                text "Status:" size 16 color "#94a3b8" yalign 0.5
                 for tab_key, tab_label in status_tabs:
                     $ is_sel = (api_filter_category == tab_key)
                     $ btn_bg = "#ef4444" if (tab_key == "Missing Only" and is_sel) else ("#10b981" if (tab_key == "Ready Only" and is_sel) else ("#2563eb" if is_sel else ("#7f1d1d44" if tab_key == "Missing Only" else "#1e293b")))
                     textbutton tab_label:
-                        text_size 10
-                        padding (8, 4)
+                        text_size 15
+                        padding (14, 7)
                         text_color ("#ffffff" if is_sel else ("#f87171" if tab_key == "Missing Only" else "#94a3b8"))
                         background btn_bg
                         action SetVariable("api_filter_category", tab_key)
 
             # Row 2: Subsystem Category Tabs
             hbox:
-                spacing 5
-                text "Subsystem:" size 11 color "#94a3b8" yalign 0.5
+                spacing 7
+                text "Subsystem:" size 16 color "#94a3b8" yalign 0.5
                 for cat in subsystem_categories:
                     $ is_sel = (api_filter_category == cat)
                     textbutton cat:
-                        text_size 10
-                        padding (7, 4)
+                        text_size 14
+                        padding (12, 7)
                         text_color ("#ffffff" if is_sel else "#94a3b8")
                         background ("#2563eb" if is_sel else "#1e293b")
                         action SetVariable("api_filter_category", cat)
 
-            null height 2
+            null height 4
 
             # Scrollable API Audit Viewport
             viewport:
                 scrollbars "vertical"
                 mousewheel True
                 draggable True
-                ysize 440
+                ysize 700
 
                 vbox:
-                    spacing 6
+                    spacing 8
                     xfill True
 
                     if not filtered_items:
                         frame:
                             xfill True
-                            padding (24, 40)
+                            padding (32, 60)
                             background "#1e293b33"
-                            text "No APIs match this filter! All items in this category are fully functional." size 13 color "#10b981" xalign 0.5
+                            text "No APIs match this filter! All items in this category are fully functional." size 18 color "#10b981" xalign 0.5
 
                     for item in filtered_items:
                         frame:
                             xfill True
-                            padding (12, 8)
+                            padding (18, 12)
                             background ("#064e3b33" if item["ok"] else "#7f1d1d33")
 
                             hbox:
-                                spacing 12
+                                spacing 16
                                 yalign 0.5
 
                                 # Status Icon
-                                text ("✔" if item["ok"] else "✘") size 16 yalign 0.5 bold True color ("#10b981" if item["ok"] else "#ef4444") substitute False
+                                text ("✔" if item["ok"] else "✘") size 24 yalign 0.5 bold True color ("#10b981" if item["ok"] else "#ef4444") substitute False
 
                                 # Name & Details
                                 vbox:
-                                    spacing 2
+                                    spacing 3
                                     hbox:
-                                        spacing 8
-                                        text item["name"] size 12 bold True color ("#ffffff" if item["ok"] else "#fca5a5") substitute False
-                                        text ("• " + item["category"]) size 10 color "#64748b" yalign 0.5 substitute False
-                                    text item["details"] size 10 color ("#94a3b8" if item["ok"] else "#f87171") substitute False
+                                        spacing 10
+                                        text item["name"] size 18 bold True color ("#ffffff" if item["ok"] else "#fca5a5") substitute False
+                                        text ("• " + item["category"]) size 14 color "#64748b" yalign 0.5 substitute False
+                                    text item["details"] size 15 color ("#94a3b8" if item["ok"] else "#f87171") substitute False
 
                                 # Right status badge
                                 frame:
                                     xalign 1.0
                                     yalign 0.5
                                     background ("#10b981" if item["ok"] else "#ef4444")
-                                    padding (8, 3)
-                                    text ("AVAILABLE" if item["ok"] else "MISSING") size 9 color "#ffffff" bold True substitute False
+                                    padding (14, 6)
+                                    text ("AVAILABLE" if item["ok"] else "MISSING") size 13 color "#ffffff" bold True substitute False
